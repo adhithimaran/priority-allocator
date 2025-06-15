@@ -1,9 +1,6 @@
 // This is your Prisma schema file,
 // learn more about it in the docs: https://pris.ly/d/prisma-schema
 
-// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
-// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
-
 generator client {
   provider = "prisma-client-js"
 }
@@ -14,47 +11,162 @@ datasource db {
 }
 
 model User {
-  id          String   @id @default(cuid())
-  email       String   @unique
-  name        String?
-  timezone    String   @default("UTC")
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id           String   @id @default(cuid())
+  email        String   @unique
+  passwordHash String   @map("password_hash")
+  timezone     String   @default("UTC")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
 
-  // User preferences
-  workHours   Json?    // Store as JSON: {"start": "09:00", "end": "17:00"}
-  energyPatterns Json? // Store energy levels by time of day
+  // User preferences stored as JSON
+  preferences  Json?    // Complete preferences object as defined in your model
   
   // Relations
-  tasks       Task[]
-  timeBlocks  TimeBlock[]
-  schedules   Schedule[]
+  tasks           Task[]
+  timeBlocks      TimeBlock[]
+  schedules       Schedule[]
+  taskCompletions TaskCompletion[]
 
   @@map("users")
 }
 
-     // Optional - only for scheduled tasks
-  createdAt   DateTime    @default(now())
-  updatedAt   DateTime    @updatedAt
+model Task {
+  id                   String    @id @default(cuid())
+  userId               String    @map("user_id")
+  title                String
+  description          String?
+  
+  // Priority calculation factors
+  estimatedDuration    Int       @map("estimated_duration") // minutes
+  difficultyLevel      Int       @map("difficulty_level")   // 1-10 scale
+  dueDate              DateTime  @map("due_date")
+  importanceLevel      Int       @map("importance_level")   // 1-10 scale
+  
+  // Calculated fields
+  priorityScore        Float?    @map("priority_score")
+  urgencyScore         Float?    @map("urgency_score")
+  
+  // Task metadata
+  status               TaskStatus @default(PENDING)
+  createdAt            DateTime  @default(now()) @map("created_at")
+  updatedAt            DateTime  @updatedAt @map("updated_at")
+  completedAt          DateTime? @map("completed_at")
+  
+  // Advanced features
+  tags                 String[]  // Array of strings
+  prerequisites        String[]  // Array of task IDs
+  energyRequirement    EnergyLevel? @map("energy_requirement")
+  isFlexible           Boolean   @default(true) @map("is_flexible")
+  preferredTimeOfDay   TimeOfDay? @map("preferred_time_of_day")
 
   // Relations
-  user        User        @relation(fields: [userId], references: [id], onDelete: Cascade)
-  task        Task?       @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  user                 User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  timeBlocks           TimeBlock[]
+  taskCompletions      TaskCompletion[]
+
+  @@map("tasks")
+}
+
+model TimeBlock {
+  id                   String      @id @default(cuid())
+  userId               String      @map("user_id")
+  
+  // Time information
+  startTime            DateTime    @map("start_time")
+  endTime              DateTime    @map("end_time")
+  durationMinutes      Int         @map("duration_minutes")
+  
+  // Block type and relationship
+  type                 BlockType
+  taskId               String?     @map("task_id")
+  
+  // Block details
+  title                String
+  description          String?
+  location             String?
+  
+  // Scheduling metadata
+  isFlexible           Boolean     @default(false) @map("is_flexible")
+  isRecurring          Boolean     @default(false) @map("is_recurring")
+  recurrencePattern    Json?       @map("recurrence_pattern")
+  
+  // Integration data
+  externalCalendarId   String?     @map("external_calendar_id")
+  externalEventId      String?     @map("external_event_id")
+  syncStatus           SyncStatus  @default(LOCAL_ONLY) @map("sync_status")
+  
+  createdAt            DateTime    @default(now()) @map("created_at")
+  updatedAt            DateTime    @updatedAt @map("updated_at")
+
+  // Relations
+  user                 User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  task                 Task?       @relation(fields: [taskId], references: [id], onDelete: Cascade)
 
   @@map("time_blocks")
 }
 
 model Schedule {
-  id                    String   @id @default(cuid())
-  userId                String
-  generatedAt           DateTime @default(now())
-  isActive              Boolean  @default(false)
-  optimizationSettings  Json?    // Algorithm parameters as JSON
+  id                    String      @id @default(cuid())
+  userId                String      @map("user_id")
+  
+  // Schedule metadata
+  name                  String
+  generatedAt           DateTime    @default(now()) @map("generated_at")
+  isActive              Boolean     @default(false) @map("is_active")
+  scheduleStart         DateTime    @map("schedule_start")
+  scheduleEnd           DateTime    @map("schedule_end")
+  
+  // Optimization information
+  optimizationSettings  Json        @map("optimization_settings")
+  
+  // Performance metrics
+  metrics               Json?
+  
+  // Status tracking
+  status                ScheduleStatus @default(GENERATING)
+  generationTimeMs      Int?        @map("generation_time_ms")
+  
+  createdAt             DateTime    @default(now()) @map("created_at")
+  updatedAt             DateTime    @updatedAt @map("updated_at")
   
   // Relations
-  user                  User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user                  User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  taskCompletions       TaskCompletion[]
 
   @@map("schedules")
+}
+
+model TaskCompletion {
+  id                        String   @id @default(cuid())
+  userId                    String   @map("user_id")
+  taskId                    String   @map("task_id")
+  scheduleId                String   @map("schedule_id")
+  
+  // Estimated vs Actual
+  estimatedDuration         Int      @map("estimated_duration")  // minutes
+  actualDuration            Int      @map("actual_duration")     // minutes
+  estimatedDifficulty       Int      @map("estimated_difficulty") // 1-10
+  actualDifficulty          Int      @map("actual_difficulty")    // 1-10
+  
+  // Context when completed
+  completedAt               DateTime @map("completed_at")
+  energyLevelAtCompletion   Int      @map("energy_level_at_completion") // 1-10
+  interruptionsCount        Int      @map("interruptions_count")
+  satisfactionScore         Int      @map("satisfaction_score")          // 1-10
+  
+  // Notes for learning
+  completionNotes           String?  @map("completion_notes")
+  wasRescheduled            Boolean  @default(false) @map("was_rescheduled")
+  rescheduleCount           Int      @default(0) @map("reschedule_count")
+  
+  createdAt                 DateTime @default(now()) @map("created_at")
+  
+  // Relations
+  user                      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  task                      Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  schedule                  Schedule @relation(fields: [scheduleId], references: [id], onDelete: Cascade)
+
+  @@map("task_completions")
 }
 
 // Enums
