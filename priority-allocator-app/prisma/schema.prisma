@@ -6,10 +6,97 @@
 
 generator client {
   provider = "prisma-client-js"
-  output   = "../generated/prisma"
 }
 
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
+}
+
+model User {
+  id          String   @id @default(cuid())
+  email       String   @unique
+  name        String?
+  timezone    String   @default("UTC")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // User preferences
+  workHours   Json?    // Store as JSON: {"start": "09:00", "end": "17:00"}
+  energyPatterns Json? // Store energy levels by time of day
+  
+  // Relations
+  tasks       Task[]
+  timeBlocks  TimeBlock[]
+  schedules   Schedule[]
+
+  @@map("users")
+}
+
+     // Optional - only for scheduled tasks
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  // Relations
+  user        User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  task        Task?       @relation(fields: [taskId], references: [id], onDelete: Cascade)
+
+  @@map("time_blocks")
+}
+
+model Schedule {
+  id                    String   @id @default(cuid())
+  userId                String
+  generatedAt           DateTime @default(now())
+  isActive              Boolean  @default(false)
+  optimizationSettings  Json?    // Algorithm parameters as JSON
+  
+  // Relations
+  user                  User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("schedules")
+}
+
+// Enums
+enum TaskStatus {
+  PENDING
+  SCHEDULED
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+enum BlockType {
+  EXISTING_COMMITMENT
+  SCHEDULED_TASK
+  BREAK
+  BUFFER
+}
+
+enum EnergyLevel {
+  LOW
+  MEDIUM
+  HIGH
+}
+
+enum TimeOfDay {
+  MORNING
+  AFTERNOON
+  EVENING
+  ANY
+}
+
+enum SyncStatus {
+  SYNCED
+  PENDING
+  CONFLICT
+  LOCAL_ONLY
+}
+
+enum ScheduleStatus {
+  GENERATING
+  READY
+  ACTIVE
+  COMPLETED
+  ARCHIVED
 }
