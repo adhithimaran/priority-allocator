@@ -1,52 +1,79 @@
-import { prisma } from '@/lib/database'
-import { calculatePriority } from '@/lib/algorithms/priority-calculator'
-import { NextResponse } from 'next/server'
+import { NextResponse } from 'next/server';
+import { PrismaClient } from '@prisma/client';
 
-export async function POST(request) {
+const prisma = new PrismaClient();
+
+// GET /api/tasks - Get all tasks for a user
+export async function GET(request) {
   try {
-    const data = await request.json()
+    const { searchParams } = new URL(request.url);
+    const userId = searchParams.get('userId');
+    
+    if (!userId) {
+      return NextResponse.json({ error: 'User ID is required' }, { status: 400 });
+    }
 
-    // Calculate priority using your algorithm
-    const priorityScore = calculatePriority(data)
-
-    const task = await prisma.task.create({
-      data: {
-        title: data.title,
-        description: data.description,
-        estimatedDuration: data.estimatedDuration,
-        difficultyLevel: data.difficultyLevel,
-        dueDate: new Date(data.dueDate),
-        importanceLevel: data.importanceLevel,
-        priorityScore,
-        userId: 'temp-user-id', // For MVP single user
+    const tasks = await prisma.task.findMany({
+      where: {
+        userId: parseInt(userId)
       },
-    })
+      orderBy: {
+        createdAt: 'desc'
+      }
+    });
 
-    return NextResponse.json(task)
+    return NextResponse.json({ tasks });
   } catch (error) {
-    console.error('Error creating task:', error)
-    return NextResponse.json(
-      { error: 'Failed to create task' },
-      { status: 500 }
-    )
+    console.error('Error fetching tasks:', error);
+    return NextResponse.json({ error: 'Failed to fetch tasks' }, { status: 500 });
   }
 }
 
-export async function GET() {
+// POST /api/tasks - Create a new task
+export async function POST(request) {
   try {
-    const tasks = await prisma.task.findMany({
-      orderBy: { priorityScore: 'desc' },
-      include: {
-        timeBlocks: true, // Include related time blocks
-      },
-    })
+    const body = await request.json();
+    const {
+      userId,
+      title,
+      description,
+      estimatedDuration,
+      difficultyLevel,
+      dueDate
+    } = body;
 
-    return NextResponse.json(tasks)
+    // Basic validation
+    if (!userId || !title || !estimatedDuration || !difficultyLevel || !dueDate) {
+      return NextResponse.json({ 
+        error: 'Missing required fields: userId, title, estimatedDuration, difficultyLevel, dueDate' 
+      }, { status: 400 });
+    }
+
+    // Calculate priority score (simple weighted algorithm for MVP)
+    const now = new Date();
+    const due = new Date(dueDate);
+    const hoursUntilDue = Math.max(1, (due - now) / (1000 * 60 * 60));
+    
+    // Priority formula: (difficulty * 10 + urgency_factor) / estimated_duration
+    const urgencyFactor = Math.max(1, 168 / hoursUntilDue); // 168 hours = 1 week
+    const priorityScore = ((difficultyLevel * 10) + urgencyFactor) / estimatedDuration;
+
+    const task = await prisma.task.create({
+      data: {
+        userId: parseInt(userId),
+        title,
+        description: description || '',
+        estimatedDuration: parseFloat(estimatedDuration),
+        difficultyLevel: parseInt(difficultyLevel),
+        dueDate: new Date(dueDate),
+        priorityScore: Math.round(priorityScore * 100) / 100,
+        status: 'pending'
+      }
+    });
+
+    return NextResponse.json({ task }, { status: 201 });
   } catch (error) {
-    console.error('Error fetching tasks:', error)
-    return NextResponse.json(
-      { error: 'Failed to fetch tasks' },
-      { status: 500 }
-    )
+    console.error('Error creating task:', error);
+    return NextResponse.json({ error: 'Failed to create task' }, { status: 500 });
   }
 }
