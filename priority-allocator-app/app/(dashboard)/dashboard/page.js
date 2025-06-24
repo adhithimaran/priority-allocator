@@ -1,8 +1,8 @@
 'use client';
 import { useState, useEffect } from 'react';
 import TaskForm from '../tasks/components/TaskForm';
-import TaskList from '../../../components/ui/TaskList';
-import SimpleCalendar from '../../../components/ui/SimpleCalendar';
+import TaskList from '../../components/ui/TaskList';
+import SimpleCalendar from '../../components/ui/SimpleCalendar';
 
 
 export default function Dashboard() {

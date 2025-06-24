@@ -1,11 +1,7 @@
 'use client';
 import { useState, useEffect } from 'react';
 import TaskForm from './components/TaskForm';
-import TaskList from '../../../components/ui/TaskList'; // Create this
-
-import { useState, useEffect } from 'react';
-import TaskForm from './components/TaskForm';
-import TaskList from './components/TaskList';
+import TaskList from '../../components/ui/TaskList';
 
 export default function TasksPage() {
   const [tasks, setTasks] = useState([]);
