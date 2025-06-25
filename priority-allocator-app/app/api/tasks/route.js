@@ -15,7 +15,7 @@ export async function GET(request) {
 
     const tasks = await prisma.task.findMany({
       where: {
-        userId: userId
+        userId: userId // Remove parseInt() - keep as string
       },
       orderBy: {
         createdAt: 'desc'
@@ -60,7 +60,7 @@ export async function POST(request) {
 
     const task = await prisma.task.create({
       data: {
-        userId: parseInt(userId),
+        userId: userId, // Remove parseInt() - keep as string
         title,
         description: description || '',
         estimatedDuration: parseFloat(estimatedDuration),
