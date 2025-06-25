@@ -15,7 +15,7 @@ export async function GET(request) {
 
     const tasks = await prisma.task.findMany({
       where: {
-        userId: parseInt(userId)
+        userId: userId
       },
       orderBy: {
         createdAt: 'desc'

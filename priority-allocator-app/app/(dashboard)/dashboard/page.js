@@ -24,10 +24,15 @@ const userId = 1; // hard-coded
 
   const loadTasks = async () => {
     try {
-      const response = await fetch('/api/tasks');
+      // Add userId parameter to the API call
+      const response = await fetch(`/api/tasks?userId=${userId}`);
       if (response.ok) {
         const data = await response.json();
-        setTasks(data);
+        // Your API returns { tasks: [...] }, so access the tasks property
+        setTasks(data.tasks || []);
+      } else {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to load tasks');
       }
     } catch (error) {
       console.error('Error loading tasks:', error);
