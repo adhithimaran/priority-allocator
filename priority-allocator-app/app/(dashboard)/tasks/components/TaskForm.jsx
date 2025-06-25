@@ -1,6 +1,6 @@
 import { useState } from 'react';
 
-export default function TaskForm({ onTaskSubmit, isLoading }) {
+export default function TaskForm({ onTaskSubmit, isLoading, userId }) {
   const [formData, setFormData] = useState({
     title: '',
     description: '',
@@ -18,26 +18,53 @@ export default function TaskForm({ onTaskSubmit, isLoading }) {
     }));
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!formData.title.trim()) return;
+    if (!formData.title.trim() || !formData.dueDate || !userId) return;
     
-    onTaskSubmit({
-      ...formData,
-      id: Date.now(),
-      completed: false,
-      createdAt: new Date().toISOString()
-    });
-    
-    // Reset form
-    setFormData({
-      title: '',
-      description: '',
-      priority: 'medium',
-      dueDate: '',
-      estimatedHours: 1,
-      difficulty: 3
-    });
+    try {
+      const response = await fetch('/api/tasks', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          userId: userId,
+          title: formData.title,
+          description: formData.description,
+          estimatedDuration: formData.estimatedHours,
+          difficultyLevel: formData.difficulty,
+          dueDate: formData.dueDate
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to create task');
+      }
+
+      const result = await response.json();
+      
+      // Call the parent component's callback if provided
+      if (onTaskSubmit) {
+        onTaskSubmit(result.task);
+      }
+      
+      // Reset form on success
+      setFormData({
+        title: '',
+        description: '',
+        priority: 'medium',
+        dueDate: '',
+        estimatedHours: 1,
+        difficulty: 3
+      });
+      
+      alert('Task created successfully!');
+    } catch (error) {
+      console.error('Error creating task:', error);
+      alert('Failed to create task: ' + error.message);
+    }
   };
 
   return (
@@ -76,23 +103,7 @@ export default function TaskForm({ onTaskSubmit, isLoading }) {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
-              Priority
-            </label>
-            <select 
-              name="priority"
-              value={formData.priority}
-              onChange={handleChange}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-            >
-              <option value="low">Low</option>
-              <option value="medium">Medium</option>
-              <option value="high">High</option>
-            </select>
-          </div>
-          
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Due Date
+              Due Date *
             </label>
             <input
               type="date"
@@ -100,14 +111,13 @@ export default function TaskForm({ onTaskSubmit, isLoading }) {
               value={formData.dueDate}
               onChange={handleChange}
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              required
             />
           </div>
-        </div>
-        
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
-              Estimated Hours
+              Estimated Hours *
             </label>
             <input
               type="number"
@@ -118,33 +128,34 @@ export default function TaskForm({ onTaskSubmit, isLoading }) {
               max="24"
               step="0.5"
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              required
             />
           </div>
-          
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Difficulty (1-5)
-            </label>
-            <input
-              type="range"
-              name="difficulty"
-              value={formData.difficulty}
-              onChange={handleChange}
-              min="1"
-              max="5"
-              className="w-full"
-            />
-            <div className="flex justify-between text-xs text-gray-500 mt-1">
-              <span>Easy</span>
-              <span className="font-medium">{formData.difficulty}</span>
-              <span>Hard</span>
-            </div>
+        </div>
+        
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            Difficulty (1-5) *
+          </label>
+          <input
+            type="range"
+            name="difficulty"
+            value={formData.difficulty}
+            onChange={handleChange}
+            min="1"
+            max="5"
+            className="w-full"
+          />
+          <div className="flex justify-between text-xs text-gray-500 mt-1">
+            <span>Easy</span>
+            <span className="font-medium">{formData.difficulty}</span>
+            <span>Hard</span>
           </div>
         </div>
         
         <button
           type="submit"
-          disabled={isLoading || !formData.title.trim()}
+          disabled={isLoading || !formData.title.trim() || !formData.dueDate || !userId}
           className="w-full bg-blue-500 text-white py-2 px-4 rounded-md hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
         >
           {isLoading ? 'Adding Task...' : 'Add Task'}
