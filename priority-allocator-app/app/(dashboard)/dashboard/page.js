@@ -12,6 +12,10 @@ export default function Dashboard() {
   const [isGenerating, setIsGenerating] = useState(false);
   const [error, setError] = useState('');
 
+// TODO: Replace this with actual user authentication
+// You'll want to get this from your auth context/session
+const userId = 1; // hard-coded
+
   // Load initial data
   useEffect(() => {
     loadTasks();
