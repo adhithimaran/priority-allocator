@@ -6,6 +6,9 @@ const prisma = new PrismaClient();
 export async function POST(request) {
   try {
     const { userId, title, description, estimatedDuration, difficultyLevel, importanceLevel, dueDate } = await request.json();
+    console.log('=== DEBUG INFO ===');
+    console.log('Received userId:', userId, 'Type:', typeof userId);
+    console.log('All received data:', { userId, title, description, estimatedDuration, difficultyLevel, importanceLevel, dueDate });
     
     // Validate required fields
     if (!userId || !title || !estimatedDuration || !difficultyLevel || !importanceLevel || !dueDate) {
