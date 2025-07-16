@@ -14,7 +14,7 @@ export default function Dashboard() {
 
 // TODO: Replace this with actual user authentication
 // You'll want to get this from your auth context/session
-const userId = 1; // hard-coded
+const userId = "1"; // hard-coded
 
   // Load initial data
   useEffect(() => {

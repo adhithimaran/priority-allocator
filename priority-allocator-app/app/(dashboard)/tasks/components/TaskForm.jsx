@@ -20,8 +20,12 @@ export default function TaskForm({ onTaskSubmit, isLoading, userId }) {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!formData.title.trim() || !formData.dueDate || !userId) return;
-    
+    console.log('Form data:', formData);
+    console.log('User ID:', userId);
+    if (!formData.title.trim() || !formData.dueDate || !userId) {
+      console.log('Validation failed');
+      return;
+    }
     try {
       const response = await fetch('/api/tasks', {
         method: 'POST',
@@ -152,7 +156,15 @@ export default function TaskForm({ onTaskSubmit, isLoading, userId }) {
             <span>Hard</span>
           </div>
         </div>
-        
+        {/* ADD THIS DEBUG SECTION */}
+        <div className="bg-red-100 p-2 mb-4 text-sm">
+          <p>Debug info:</p>
+          <p>isLoading: {isLoading ? 'true' : 'false'}</p>
+          <p>title: '{formData.title}' (length: {formData.title.length})</p>
+          <p>dueDate: '{formData.dueDate}'</p>
+          <p>userId: '{userId}'</p>
+          <p>title.trim(): '{formData.title.trim()}'</p>
+        </div>
         <button
           type="submit"
           disabled={isLoading || !formData.title.trim() || !formData.dueDate || !userId}
