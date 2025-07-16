@@ -113,7 +113,7 @@ export default function TasksPage() {
 
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-8">
         <div>
-          <TaskForm onTaskSubmit={handleTaskSubmit} isLoading={isLoading} />
+          <TaskForm onTaskSubmit={handleTaskSubmit} isLoading={isLoading} userId={userId} />
         </div>
         <div>
           <TaskList 
