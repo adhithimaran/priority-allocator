@@ -206,7 +206,7 @@ const userId = "1"; // hard-coded
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
           {/* Left Column - Task Management */}
           <div className="space-y-6">
-            <TaskForm onTaskSubmit={handleTaskSubmit} isLoading={isLoading} />
+            <TaskForm onTaskSubmit={handleTaskSubmit} isLoading={isLoading} userId="test-user-123"/>
             <TaskList 
               tasks={tasks}
               onDeleteTask={handleDeleteTask}
