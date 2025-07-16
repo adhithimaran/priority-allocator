@@ -39,13 +39,14 @@ export async function POST(request) {
       description,
       estimatedDuration,
       difficultyLevel,
+      importanceLevel,
       dueDate
     } = body;
 
     // Basic validation
-    if (!userId || !title || !estimatedDuration || !difficultyLevel || !dueDate) {
+    if (!userId || !title || !estimatedDuration || !difficultyLevel || !importanceLevel || !dueDate) {
       return NextResponse.json({ 
-        error: 'Missing required fields: userId, title, estimatedDuration, difficultyLevel, dueDate' 
+        error: 'Missing required fields: userId, title, estimatedDuration, difficultyLevel, importanceLevel, dueDate' 
       }, { status: 400 });
     }
 
@@ -54,9 +55,9 @@ export async function POST(request) {
     const due = new Date(dueDate);
     const hoursUntilDue = Math.max(1, (due - now) / (1000 * 60 * 60));
     
-    // Priority formula: (difficulty * 10 + urgency_factor) / estimated_duration
+    // Priority formula: (difficulty * importance * 10 + urgency_factor) / estimated_duration
     const urgencyFactor = Math.max(1, 168 / hoursUntilDue); // 168 hours = 1 week
-    const priorityScore = ((difficultyLevel * 10) + urgencyFactor) / estimatedDuration;
+    const priorityScore = ((difficultyLevel * importanceLevel * 10) + urgencyFactor) / estimatedDuration;
 
     const task = await prisma.task.create({
       data: {
@@ -65,6 +66,7 @@ export async function POST(request) {
         description: description || '',
         estimatedDuration: parseFloat(estimatedDuration),
         difficultyLevel: parseInt(difficultyLevel),
+        importanceLevel: parseInt(importanceLevel),
         dueDate: new Date(dueDate),
         priorityScore: Math.round(priorityScore * 100) / 100,
         status: 'pending'

@@ -58,17 +58,34 @@ const userId = "1"; // hard-coded
     setError('');
     
     try {
+      // Debug: Log the taskData to see what we're receiving
+      console.log('Task data received:', taskData);
+      
+      // Ensure all required fields are present
+      const requestData = {
+        userId: userId,
+        title: taskData.title,
+        description: taskData.description || '',
+        estimatedDuration: taskData.estimatedDuration,
+        difficultyLevel: taskData.difficultyLevel,
+        importanceLevel: taskData.importanceLevel || taskData.importance || 3, // fallback to 3 if missing
+        dueDate: taskData.dueDate
+      };
+      
+      // Debug: Log the request data
+      console.log('Request data being sent:', requestData);
+      
       const response = await fetch('/api/tasks', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(taskData),
+        body: JSON.stringify(requestData),
       });
 
       if (response.ok) {
-        const newTask = await response.json();
-        setTasks(prev => [...prev, newTask]);
+        const result = await response.json();
+        setTasks(prev => [...prev, result.task]);
       } else {
         const errorData = await response.json();
         throw new Error(errorData.error || 'Failed to create task');
@@ -80,6 +97,7 @@ const userId = "1"; // hard-coded
       setIsLoading(false);
     }
   };
+
 
   const handleDeleteTask = async (taskId) => {
     try {
@@ -206,7 +224,7 @@ const userId = "1"; // hard-coded
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
           {/* Left Column - Task Management */}
           <div className="space-y-6">
-            <TaskForm onTaskSubmit={handleTaskSubmit} isLoading={isLoading} userId="test-user-123"/>
+            <TaskForm onTaskSubmit={handleTaskSubmit} isLoading={isLoading} userId={userId}/>
             <TaskList 
               tasks={tasks}
               onDeleteTask={handleDeleteTask}
