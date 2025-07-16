@@ -7,7 +7,8 @@ export default function TaskForm({ onTaskSubmit, isLoading, userId }) {
     priority: 'medium',
     dueDate: '',
     estimatedHours: 1,
-    difficulty: 3
+    difficulty: 3,
+    importance: 3 // Added importance field
   });
 
   const handleChange = (e) => {
@@ -18,10 +19,13 @@ export default function TaskForm({ onTaskSubmit, isLoading, userId }) {
     }));
   };
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    if (!formData.title.trim() || !formData.dueDate || !userId) return;
-    
+  const handleSubmit = async () => {
+    console.log('Form data:', formData);
+    console.log('User ID:', userId);
+    if (!formData.title.trim() || !formData.dueDate || !userId) {
+      console.log('Validation failed');
+      return;
+    }
     try {
       const response = await fetch('/api/tasks', {
         method: 'POST',
@@ -34,6 +38,7 @@ export default function TaskForm({ onTaskSubmit, isLoading, userId }) {
           description: formData.description,
           estimatedDuration: formData.estimatedHours,
           difficultyLevel: formData.difficulty,
+          importanceLevel: formData.importance, // Added importance level
           dueDate: formData.dueDate
         }),
       });
@@ -57,7 +62,8 @@ export default function TaskForm({ onTaskSubmit, isLoading, userId }) {
         priority: 'medium',
         dueDate: '',
         estimatedHours: 1,
-        difficulty: 3
+        difficulty: 3,
+        importance: 3 // Reset importance field
       });
       
       alert('Task created successfully!');
@@ -70,7 +76,7 @@ export default function TaskForm({ onTaskSubmit, isLoading, userId }) {
   return (
     <div className="bg-white p-6 rounded-lg shadow-md">
       <h2 className="text-xl font-semibold mb-4">Add New Task</h2>
-      <form onSubmit={handleSubmit} className="space-y-4">
+      <div className="space-y-4">
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">
             Task Title *
@@ -133,34 +139,68 @@ export default function TaskForm({ onTaskSubmit, isLoading, userId }) {
           </div>
         </div>
         
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            Difficulty (1-5) *
-          </label>
-          <input
-            type="range"
-            name="difficulty"
-            value={formData.difficulty}
-            onChange={handleChange}
-            min="1"
-            max="5"
-            className="w-full"
-          />
-          <div className="flex justify-between text-xs text-gray-500 mt-1">
-            <span>Easy</span>
-            <span className="font-medium">{formData.difficulty}</span>
-            <span>Hard</span>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Difficulty (1-5) *
+            </label>
+            <input
+              type="range"
+              name="difficulty"
+              value={formData.difficulty}
+              onChange={handleChange}
+              min="1"
+              max="5"
+              className="w-full"
+            />
+            <div className="flex justify-between text-xs text-gray-500 mt-1">
+              <span>Easy</span>
+              <span className="font-medium">{formData.difficulty}</span>
+              <span>Hard</span>
+            </div>
+          </div>
+          
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Importance (1-5) *
+            </label>
+            <input
+              type="range"
+              name="importance"
+              value={formData.importance}
+              onChange={handleChange}
+              min="1"
+              max="5"
+              className="w-full"
+            />
+            <div className="flex justify-between text-xs text-gray-500 mt-1">
+              <span>Low</span>
+              <span className="font-medium">{formData.importance}</span>
+              <span>High</span>
+            </div>
           </div>
         </div>
         
+        {/* Debug section - you can remove this once everything is working */}
+        <div className="bg-gray-100 p-2 mb-4 text-sm rounded">
+          <p className="font-medium">Debug info:</p>
+          <p>isLoading: {isLoading ? 'true' : 'false'}</p>
+          <p>title: '{formData.title}' (length: {formData.title.length})</p>
+          <p>dueDate: '{formData.dueDate}'</p>
+          <p>userId: '{userId}'</p>
+          <p>difficulty: {formData.difficulty}</p>
+          <p>importance: {formData.importance}</p>
+        </div>
+        
         <button
-          type="submit"
+          type="button"
+          onClick={handleSubmit}
           disabled={isLoading || !formData.title.trim() || !formData.dueDate || !userId}
           className="w-full bg-blue-500 text-white py-2 px-4 rounded-md hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
         >
           {isLoading ? 'Adding Task...' : 'Add Task'}
         </button>
-      </form>
+      </div>
     </div>
   );
 }
