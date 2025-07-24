@@ -11,8 +11,29 @@ export async function POST(request) {
     console.log('All received data:', { userId, title, description, estimatedDuration, difficultyLevel, importanceLevel, dueDate });
     
     // Validate required fields
-    if (!userId || !title || !estimatedDuration || !difficultyLevel || !importanceLevel || !dueDate) {
+    if (!title || !estimatedDuration || !difficultyLevel || !importanceLevel || !dueDate) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
+    }
+
+    // Option 2: Use an existing user or create one if none exist
+    let actualUserId;
+    const existingUser = await prisma.user.findFirst();
+
+    if (!existingUser) {
+      // No users exist, create one
+      console.log('No users found, creating a new user...');
+      const newUser = await prisma.user.create({
+        data: {
+          email: "test@example.com", 
+          name: "Test User",
+          // Add any other required fields from your User model here
+        }
+      });
+      actualUserId = newUser.id;
+      console.log('Created new user with ID:', actualUserId);
+    } else {
+      actualUserId = existingUser.id;
+      console.log('Using existing user with ID:', actualUserId);
     }
 
     // Calculate priority score
@@ -24,10 +45,12 @@ export async function POST(request) {
     const urgencyFactor = Math.max(1, 168 / hoursUntilDue); // 168 hours = 1 week
     const priorityScore = (difficultyLevel * importanceLevel * 10 + urgencyFactor) / estimatedDuration;
 
-    // Create task with proper enum value
+    console.log('Creating task with userId:', actualUserId);
+
+    // Create task with the valid user ID
     const task = await prisma.task.create({
       data: {
-        userId: userId,
+        userId: actualUserId,
         title,
         description,
         estimatedDuration: parseFloat(estimatedDuration),
@@ -55,10 +78,15 @@ export async function POST(request) {
 export async function GET(request) {
   try {
     const { searchParams } = new URL(request.url);
-    const userId = searchParams.get('userId');
+    let userId = searchParams.get('userId');
     
+    // If no userId provided, use the first available user
     if (!userId) {
-      return NextResponse.json({ error: 'User ID is required' }, { status: 400 });
+      const firstUser = await prisma.user.findFirst();
+      if (!firstUser) {
+        return NextResponse.json({ error: 'No users found' }, { status: 404 });
+      }
+      userId = firstUser.id;
     }
 
     const tasks = await prisma.task.findMany({
