@@ -1,5 +1,7 @@
 import { NextResponse } from 'next/server';
 import { PrismaClient } from '@prisma/client';
+// In app/api/tasks/route.js
+import { calculatePriorityScore } from '../../lib/algorithms/priority-calculator';
 
 const prisma = new PrismaClient();
 
