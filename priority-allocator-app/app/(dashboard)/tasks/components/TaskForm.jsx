@@ -8,8 +8,10 @@ export default function TaskForm({ onTaskSubmit, isLoading, userId }) {
     dueDate: '',
     estimatedHours: 1,
     difficulty: 3,
-    importance: 3 // Added importance field
+    importance: 3
   });
+
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -19,13 +21,21 @@ export default function TaskForm({ onTaskSubmit, isLoading, userId }) {
     }));
   };
 
-  const handleSubmit = async () => {
+  const handleSubmit = async (e) => {
+    e.preventDefault(); // Prevent default form submission
+    
     console.log('Form data:', formData);
     console.log('User ID:', userId);
+    
     if (!formData.title.trim() || !formData.dueDate || !userId) {
       console.log('Validation failed');
       return;
     }
+
+    if (isSubmitting) return; // Prevent double submission
+
+    setIsSubmitting(true);
+
     try {
       const response = await fetch('/api/tasks', {
         method: 'POST',
@@ -38,7 +48,7 @@ export default function TaskForm({ onTaskSubmit, isLoading, userId }) {
           description: formData.description,
           estimatedDuration: formData.estimatedHours,
           difficultyLevel: formData.difficulty,
-          importanceLevel: formData.importance, // Added importance level
+          importanceLevel: formData.importance,
           dueDate: formData.dueDate
         }),
       });
@@ -63,20 +73,22 @@ export default function TaskForm({ onTaskSubmit, isLoading, userId }) {
         dueDate: '',
         estimatedHours: 1,
         difficulty: 3,
-        importance: 3 // Reset importance field
+        importance: 3
       });
       
       alert('Task created successfully!');
     } catch (error) {
       console.error('Error creating task:', error);
       alert('Failed to create task: ' + error.message);
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
   return (
     <div className="bg-white p-6 rounded-lg shadow-md">
       <h2 className="text-xl font-semibold mb-4">Add New Task</h2>
-      <div className="space-y-4">
+      <form onSubmit={handleSubmit} className="space-y-4">
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">
             Task Title *
@@ -185,6 +197,7 @@ export default function TaskForm({ onTaskSubmit, isLoading, userId }) {
         <div className="bg-gray-100 p-2 mb-4 text-sm rounded">
           <p className="font-medium">Debug info:</p>
           <p>isLoading: {isLoading ? 'true' : 'false'}</p>
+          <p>isSubmitting: {isSubmitting ? 'true' : 'false'}</p>
           <p>title: '{formData.title}' (length: {formData.title.length})</p>
           <p>dueDate: '{formData.dueDate}'</p>
           <p>userId: '{userId}'</p>
@@ -193,14 +206,13 @@ export default function TaskForm({ onTaskSubmit, isLoading, userId }) {
         </div>
         
         <button
-          type="button"
-          onClick={handleSubmit}
-          disabled={isLoading || !formData.title.trim() || !formData.dueDate || !userId}
+          type="submit"
+          disabled={isSubmitting || isLoading || !formData.title.trim() || !formData.dueDate || !userId}
           className="w-full bg-blue-500 text-white py-2 px-4 rounded-md hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
         >
-          {isLoading ? 'Adding Task...' : 'Add Task'}
+          {isSubmitting || isLoading ? 'Adding Task...' : 'Add Task'}
         </button>
-      </div>
+      </form>
     </div>
   );
 }

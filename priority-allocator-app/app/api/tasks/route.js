@@ -3,8 +3,11 @@ import { PrismaClient } from '@prisma/client';
 
 const prisma = new PrismaClient();
 
+
+
 export async function POST(request) {
   try {
+    console.log('=== API CALL RECEIVED ===', new Date().toISOString(), Math.random());
     const { userId, title, description, estimatedDuration, difficultyLevel, importanceLevel, dueDate } = await request.json();
     console.log('=== DEBUG INFO ===');
     console.log('Received userId:', userId, 'Type:', typeof userId);
