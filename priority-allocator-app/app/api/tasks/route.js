@@ -107,3 +107,79 @@ export async function GET(request) {
     }, { status: 500 });
   }
 }
+
+
+// Add these methods to your existing /app/api/tasks/route.js file
+
+export async function PATCH(request) {
+  try {
+    const { searchParams } = new URL(request.url);
+    const taskId = searchParams.get('id');
+    
+    if (!taskId) {
+      return NextResponse.json({ error: 'Task ID is required' }, { status: 400 });
+    }
+
+    const { status } = await request.json();
+    
+    if (!status) {
+      return NextResponse.json({ error: 'Status is required' }, { status: 400 });
+    }
+
+    // Convert status to uppercase to match your enum
+    const upperStatus = status.toUpperCase();
+    
+    const task = await prisma.task.update({
+      where: { id: taskId },
+      data: { 
+        status: upperStatus,
+        updatedAt: new Date()
+      }
+    });
+
+    return NextResponse.json({ 
+      message: 'Task updated successfully',
+      task 
+    });
+    
+  } catch (error) {
+    console.error('Error updating task:', error);
+    return NextResponse.json({ 
+      error: 'Internal server error: ' + error.message 
+    }, { status: 500 });
+  }
+}
+
+export async function DELETE(request) {
+  try {
+    const { searchParams } = new URL(request.url);
+    const taskId = searchParams.get('id');
+    
+    if (!taskId) {
+      return NextResponse.json({ error: 'Task ID is required' }, { status: 400 });
+    }
+
+    // Check if task exists before deleting
+    const existingTask = await prisma.task.findUnique({
+      where: { id: taskId }
+    });
+
+    if (!existingTask) {
+      return NextResponse.json({ error: 'Task not found' }, { status: 404 });
+    }
+
+    await prisma.task.delete({
+      where: { id: taskId }
+    });
+
+    return NextResponse.json({ 
+      message: 'Task deleted successfully' 
+    });
+    
+  } catch (error) {
+    console.error('Error deleting task:', error);
+    return NextResponse.json({ 
+      error: 'Internal server error: ' + error.message 
+    }, { status: 500 });
+  }
+}

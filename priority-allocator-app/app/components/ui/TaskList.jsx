@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { 
   ensureTasksPriority, 
   sortTasksByPriority, 
@@ -8,8 +8,111 @@ import {
   getPriorityLabel 
 } from '../../lib/algorithms/priority-calculator';
 
-export default function TaskList({ tasks, onDeleteTask, onToggleComplete }) {
+export default function TaskList() {
   const [filter, setFilter] = useState('all'); // all, pending, completed
+  const [tasks, setTasks] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+
+  // Fetch tasks from database
+  const fetchTasks = async () => {
+    try {
+      setLoading(true);
+      const response = await fetch('/api/tasks');
+      
+      if (!response.ok) {
+        throw new Error('Failed to fetch tasks');
+      }
+      
+      const data = await response.json();
+      
+      // Transform API data to match your component's expected format
+      const transformedTasks = data.tasks.map(task => ({
+        id: task.id,
+        title: task.title,
+        description: task.description,
+        status: task.status?.toLowerCase() || 'pending', // Convert PENDING to pending
+        due_date: task.dueDate, // API uses dueDate, component expects due_date
+        estimated_duration: task.estimatedDuration, // API uses estimatedDuration
+        difficulty_level: task.difficultyLevel, // API uses difficultyLevel
+        importance_level: task.importanceLevel, // API uses importanceLevel
+        priority_score: task.priorityScore, // API uses priorityScore
+        created_at: task.createdAt,
+        updated_at: task.updatedAt
+      }));
+      
+      setTasks(transformedTasks);
+      setError(null);
+    } catch (err) {
+      console.error('Error fetching tasks:', err);
+      setError(err.message);
+      setTasks([]); // Set empty array on error
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Toggle task completion status
+  const onToggleComplete = async (taskId) => {
+    try {
+      const task = tasks.find(t => t.id === taskId);
+      if (!task) return;
+
+      const newStatus = task.status === 'completed' ? 'pending' : 'completed';
+      
+      // Optimistically update UI
+      setTasks(prevTasks => 
+        prevTasks.map(t => 
+          t.id === taskId ? { ...t, status: newStatus } : t
+        )
+      );
+
+      // Update in database
+      const response = await fetch(`/api/tasks?id=${taskId}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ status: newStatus }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to update task');
+      }
+      
+    } catch (err) {
+      console.error('Error updating task:', err);
+      // Revert optimistic update on error
+      fetchTasks();
+    }
+  };
+
+  // Delete task
+  const onDeleteTask = async (taskId) => {
+    try {
+      // Optimistically remove from UI
+      setTasks(prevTasks => prevTasks.filter(t => t.id !== taskId));
+
+      // Delete from database
+      const response = await fetch(`/api/tasks?id=${taskId}`, {
+        method: 'DELETE',
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to delete task');
+      }
+      
+    } catch (err) {
+      console.error('Error deleting task:', err);
+      // Revert optimistic update on error
+      fetchTasks();
+    }
+  };
+
+  // Load tasks on component mount
+  useEffect(() => {
+    fetchTasks();
+  }, []);
 
   // Ensure all tasks have priority scores and sort them
   const processedTasks = useMemo(() => {
@@ -59,6 +162,40 @@ export default function TaskList({ tasks, onDeleteTask, onToggleComplete }) {
     const score = task.priority_score || 0;
     return `${getPriorityLabel(score)} (${score.toFixed(1)})`;
   };
+
+  // Loading state
+  if (loading) {
+    return (
+      <div className="bg-white rounded-lg shadow-md">
+        <div className="p-4 border-b">
+          <h2 className="text-xl font-semibold">Tasks</h2>
+        </div>
+        <div className="p-8 text-center text-gray-500">
+          Loading tasks...
+        </div>
+      </div>
+    );
+  }
+
+  // Error state
+  if (error) {
+    return (
+      <div className="bg-white rounded-lg shadow-md">
+        <div className="p-4 border-b">
+          <h2 className="text-xl font-semibold">Tasks</h2>
+        </div>
+        <div className="p-8 text-center">
+          <div className="text-red-500 mb-4">Error loading tasks: {error}</div>
+          <button
+            onClick={fetchTasks}
+            className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
+          >
+            Retry
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="bg-white rounded-lg shadow-md">
