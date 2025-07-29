@@ -1,4 +1,4 @@
-# Priority_Allocator
+# Priority Allocator
 
 A smart productivity scheduler that helps users plan tasks efficiently based on time, difficulty, and deadlines — like a personal assistant that auto-manages your day.
 
