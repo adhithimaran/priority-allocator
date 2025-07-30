@@ -1,306 +1,343 @@
-'use client';
+// Priority calculation functions (copied from your priority algorithm)
+function calculatePriorityScore(task, options = {}) {
+  const {
+    urgencyWeight = 0.6,
+    difficultyWeight = 0.3,
+    durationWeight = 0.1,
+    currentTime = new Date()
+  } = options;
 
-import { useState, useMemo, useEffect } from 'react';
-import { 
-  ensureTasksPriority, 
-  sortTasksByPriority, 
-  getPriorityColor, 
-  getPriorityLabel 
-} from '../../lib/algorithms/priority-calculator';
-
-export default function TaskList() {
-  const [filter, setFilter] = useState('all'); // all, pending, completed
-  const [tasks, setTasks] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-
-  // Fetch tasks from database
-  const fetchTasks = async () => {
-    try {
-      setLoading(true);
-      const response = await fetch('/api/tasks');
-      
-      if (!response.ok) {
-        throw new Error('Failed to fetch tasks');
-      }
-      
-      const data = await response.json();
-      
-      // Transform API data to match your component's expected format
-      const transformedTasks = data.tasks.map(task => ({
-        id: task.id,
-        title: task.title,
-        description: task.description,
-        status: task.status?.toLowerCase() || 'pending', // Convert PENDING to pending
-        due_date: task.dueDate, // API uses dueDate, component expects due_date
-        estimated_duration: task.estimatedDuration, // API uses estimatedDuration
-        difficulty_level: task.difficultyLevel, // API uses difficultyLevel
-        importance_level: task.importanceLevel, // API uses importanceLevel
-        priority_score: task.priorityScore, // API uses priorityScore
-        created_at: task.createdAt,
-        updated_at: task.updatedAt
-      }));
-      
-      setTasks(transformedTasks);
-      setError(null);
-    } catch (err) {
-      console.error('Error fetching tasks:', err);
-      setError(err.message);
-      setTasks([]); // Set empty array on error
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // Toggle task completion status
-  const onToggleComplete = async (taskId) => {
-    try {
-      const task = tasks.find(t => t.id === taskId);
-      if (!task) return;
-
-      const newStatus = task.status === 'completed' ? 'pending' : 'completed';
-      
-      // Optimistically update UI
-      setTasks(prevTasks => 
-        prevTasks.map(t => 
-          t.id === taskId ? { ...t, status: newStatus } : t
-        )
-      );
-
-      // Update in database
-      const response = await fetch(`/api/tasks?id=${taskId}`, {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ status: newStatus }),
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to update task');
-      }
-      
-    } catch (err) {
-      console.error('Error updating task:', err);
-      // Revert optimistic update on error
-      fetchTasks();
-    }
-  };
-
-  // Delete task
-  const onDeleteTask = async (taskId) => {
-    try {
-      // Optimistically remove from UI
-      setTasks(prevTasks => prevTasks.filter(t => t.id !== taskId));
-
-      // Delete from database
-      const response = await fetch(`/api/tasks?id=${taskId}`, {
-        method: 'DELETE',
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to delete task');
-      }
-      
-    } catch (err) {
-      console.error('Error deleting task:', err);
-      // Revert optimistic update on error
-      fetchTasks();
-    }
-  };
-
-  // Load tasks on component mount
-  useEffect(() => {
-    fetchTasks();
-  }, []);
-
-  // Ensure all tasks have priority scores and sort them
-  const processedTasks = useMemo(() => {
-    if (!tasks || tasks.length === 0) return [];
-    
-    const tasksWithPriority = ensureTasksPriority(tasks);
-    return sortTasksByPriority(tasksWithPriority);
-  }, [tasks]);
-
-  const filteredTasks = processedTasks.filter(task => {
-    if (filter === 'pending') return task.status !== 'completed';
-    if (filter === 'completed') return task.status === 'completed';
-    return true;
-  });
-
-  const formatDate = (dateString) => {
-    if (!dateString) return 'No date';
-    try {
-      return new Date(dateString).toLocaleDateString('en-US', {
-        month: 'short',
-        day: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit'
-      });
-    } catch (error) {
-      return 'Invalid date';
-    }
-  };
-
-  const getDifficultyColor = (level) => {
-    if (!level || level <= 3) return 'bg-green-100 text-green-800';
-    if (level <= 6) return 'bg-yellow-100 text-yellow-800';
-    return 'bg-red-100 text-red-800';
-  };
-
-  const renderPriorityIndicator = (task) => {
-    const score = task.priority_score || 0;
-    return (
-      <div
-        className={`w-3 h-3 rounded-full ${getPriorityColor(score)}`}
-        title={`Priority: ${getPriorityLabel(score)} (${score.toFixed(1)})`}
-      />
-    );
-  };
-
-  const renderPriorityText = (task) => {
-    const score = task.priority_score || 0;
-    return `${getPriorityLabel(score)} (${score.toFixed(1)})`;
-  };
-
-  // Loading state
-  if (loading) {
-    return (
-      <div className="bg-white rounded-lg shadow-md">
-        <div className="p-4 border-b">
-          <h2 className="text-xl font-semibold">Tasks</h2>
-        </div>
-        <div className="p-8 text-center text-gray-500">
-          Loading tasks...
-        </div>
-      </div>
-    );
+  if (!task.dueDate || task.difficultyLevel === undefined || task.estimatedDuration === undefined) {
+    return 0;
   }
 
-  // Error state
-  if (error) {
+  const dueDate = new Date(task.dueDate);
+  const hoursUntilDue = (dueDate - currentTime) / (1000 * 60 * 60);
+  
+  const urgencyScore = calculateUrgencyScore(hoursUntilDue);
+  const difficultyFactor = calculateDifficultyFactor(task.difficultyLevel);
+  const durationFactor = calculateDurationFactor(task.estimatedDuration * 60); // Convert hours to minutes
+  
+  const priorityScore = (urgencyScore * urgencyWeight) + 
+                       (difficultyFactor * difficultyWeight) + 
+                       (durationFactor * durationWeight);
+  
+  return Math.min(Math.max(priorityScore, 0), 10);
+}
+
+function calculateUrgencyScore(hoursUntilDue) {
+  if (hoursUntilDue <= 0) return 10;     // Overdue
+  if (hoursUntilDue <= 24) return 9;     // Due within 24 hours
+  if (hoursUntilDue <= 72) return 7;     // Due within 3 days
+  if (hoursUntilDue <= 168) return 5;    // Due within a week
+  if (hoursUntilDue <= 720) return 3;    // Due within a month
+  return 1;                              // Due later
+}
+
+function calculateDifficultyFactor(difficultyLevel) {
+  return Math.min(difficultyLevel / 10, 1) * 3;
+}
+
+function calculateDurationFactor(estimatedDuration) {
+  const baselineDuration = 240; // 4 hours as baseline
+  return Math.min(estimatedDuration / baselineDuration, 1) * 2;
+}
+
+function getPriorityLabel(score) {
+  if (score >= 8) return 'Critical';
+  if (score >= 6) return 'High';
+  if (score >= 4) return 'Medium';
+  if (score >= 2) return 'Low';
+  return 'Minimal';
+}
+
+function getPriorityColor(score) {
+  if (score >= 8) return 'bg-red-500';
+  if (score >= 6) return 'bg-orange-500';
+  if (score >= 4) return 'bg-yellow-500';
+  return 'bg-green-500';
+}
+
+function ensureTasksPriority(tasks, options = {}) {
+  return tasks.map(task => ({
+    ...task,
+    priorityScore: task.priorityScore !== undefined 
+      ? task.priorityScore 
+      : calculatePriorityScore(task, options)
+  }));
+}
+
+function sortTasksByPriority(tasks) {
+  return [...tasks].sort((a, b) => {
+    const priorityDiff = b.priorityScore - a.priorityScore;
+    if (Math.abs(priorityDiff) > 0.1) {
+      return priorityDiff;
+    }
+    return new Date(a.dueDate) - new Date(b.dueDate);
+  });
+} 
+
+// TaskCard component (embedded)
+function TaskCard({ 
+  task, 
+  onToggleComplete, 
+  onDeleteTask, 
+  onEditTask,
+  className = '' 
+}) {
+  const priorityScore = task.priorityScore || task.priority_score || 
+    calculatePriorityScore(task);
+  
+  const priorityLabel = getPriorityLabel(priorityScore);
+  const priorityColorClass = getPriorityColor(priorityScore);
+
+  const getDifficultyText = (difficulty) => {
+    if (difficulty <= 2) return 'Easy';
+    if (difficulty <= 4) return 'Medium';
+    if (difficulty <= 6) return 'Hard';
+    if (difficulty <= 8) return 'Very Hard';
+    return 'Extreme';
+  };
+
+  const getImportanceText = (importance) => {
+    if (importance <= 2) return 'Low';
+    if (importance <= 4) return 'Medium';
+    if (importance <= 6) return 'High';
+    if (importance <= 8) return 'Very High';
+    return 'Critical';
+  };
+
+  const isOverdue = task.dueDate && new Date(task.dueDate) < new Date() && task.status !== 'COMPLETED';
+  const isDueSoon = task.dueDate && task.status !== 'COMPLETED' && 
+    new Date(task.dueDate) <= new Date(Date.now() + 2 * 24 * 60 * 60 * 1000);
+
+  const isCompleted = task.status === 'COMPLETED' || task.completed;
+
+  return (
+    <div className={`
+      bg-white rounded-lg shadow-md border transition-all duration-200 hover:shadow-lg
+      ${isCompleted ? 'opacity-75 bg-green-50' : ''}
+      ${isOverdue ? 'border-red-300 bg-red-50' : ''}
+      ${isDueSoon && !isOverdue ? 'border-yellow-300 bg-yellow-50' : ''}
+      ${className}
+    `}>
+      <div className="p-4">
+        {/* Header with checkbox and priority */}
+        <div className="flex items-start justify-between mb-3">
+          <div className="flex items-start space-x-3">
+            <button
+              onClick={() => onToggleComplete(task.id)}
+              className={`
+                w-5 h-5 rounded border-2 flex items-center justify-center mt-0.5 transition-colors
+                ${isCompleted
+                  ? 'bg-green-500 border-green-500 text-white'
+                  : 'border-gray-300 hover:border-green-400'
+                }
+              `}
+            >
+              {isCompleted && '✓'}
+            </button>
+            <div className="flex-1">
+              <h3 className={`
+                font-semibold text-lg leading-tight
+                ${isCompleted ? 'line-through text-gray-500' : 'text-gray-900'}
+              `}>
+                {task.title}
+              </h3>
+            </div>
+          </div>
+          
+          <div className="flex items-center space-x-2">
+            {/* Priority Score */}
+            <span className="text-xs bg-gray-100 px-2 py-1 rounded">
+              Score: {priorityScore.toFixed(1)}
+            </span>
+            {/* Priority Label */}
+            <span className={`
+              text-xs px-2 py-1 rounded-full border font-medium text-white
+              ${priorityColorClass}
+            `}>
+              {priorityLabel}
+            </span>
+          </div>
+        </div>
+
+        {/* Description */}
+        {task.description && (
+          <p className={`
+            text-sm mb-3 leading-relaxed
+            ${isCompleted ? 'text-gray-400' : 'text-gray-600'}
+          `}>
+            {task.description}
+          </p>
+        )}
+
+        {/* Task details */}
+        <div className="grid grid-cols-2 gap-2 text-xs text-gray-600 mb-3">
+          <div className="flex items-center space-x-1">
+            <span>⏱️</span>
+            <span>{task.estimatedDuration}h duration</span>
+          </div>
+          
+          <div className="flex items-center space-x-1">
+            <span>📊</span>
+            <span>Difficulty: {getDifficultyText(task.difficultyLevel)} ({task.difficultyLevel}/10)</span>
+          </div>
+          
+          <div className="flex items-center space-x-1">
+            <span>⚡</span>
+            <span>Importance: {getImportanceText(task.importanceLevel)} ({task.importanceLevel}/10)</span>
+          </div>
+          
+          {task.dueDate && (
+            <div className={`
+              flex items-center space-x-1
+              ${isOverdue ? 'text-red-600 font-medium' : ''}
+              ${isDueSoon && !isOverdue ? 'text-yellow-600 font-medium' : ''}
+            `}>
+              <span>📅</span>
+              <span>
+                Due: {new Date(task.dueDate).toLocaleDateString()}
+                {isOverdue && ' (Overdue!)'}
+                {isDueSoon && !isOverdue && ' (Soon)'}
+              </span>
+            </div>
+          )}
+        </div>
+
+        {/* Time until due */}
+        {task.dueDate && !isCompleted && (
+          <div className="text-xs text-gray-500 mb-3">
+            {(() => {
+              const now = new Date();
+              const due = new Date(task.dueDate);
+              const hoursLeft = Math.max(0, (due - now) / (1000 * 60 * 60));
+              
+              if (hoursLeft <= 0) return "⚠️ Overdue";
+              if (hoursLeft < 24) return `🔥 ${Math.round(hoursLeft)} hours left`;
+              const daysLeft = Math.round(hoursLeft / 24);
+              return `📆 ${daysLeft} days left`;
+            })()}
+          </div>
+        )}
+
+        {/* Actions */}
+        <div className="flex items-center justify-between pt-3 border-t border-gray-100">
+          <div className="text-xs text-gray-400">
+            {task.createdAt && `Created ${new Date(task.createdAt).toLocaleDateString()}`}
+          </div>
+          
+          <div className="flex items-center space-x-2">
+            {onEditTask && (
+              <button
+                onClick={() => onEditTask(task)}
+                className="text-blue-500 hover:text-blue-700 p-1 rounded transition-colors"
+                title="Edit task"
+              >
+                ✏️
+              </button>
+            )}
+            
+            <button
+              onClick={() => onDeleteTask(task.id)}
+              className="text-red-500 hover:text-red-700 p-1 rounded transition-colors"
+              title="Delete task"
+            >
+              🗑️
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// Main TaskList component
+export default function TaskList({ 
+  tasks = [], 
+  onDeleteTask, 
+  onToggleComplete, 
+  onEditTask 
+}) {
+  // Process tasks to ensure they have priority scores and sort them
+  const processedTasks = ensureTasksPriority(tasks);
+  const sortedTasks = sortTasksByPriority(processedTasks);
+
+  // Filter tasks by status
+  const pendingTasks = sortedTasks.filter(task => task.status !== 'COMPLETED' && !task.completed);
+  const completedTasks = sortedTasks.filter(task => task.status === 'COMPLETED' || task.completed);
+
+  if (tasks.length === 0) {
     return (
-      <div className="bg-white rounded-lg shadow-md">
-        <div className="p-4 border-b">
-          <h2 className="text-xl font-semibold">Tasks</h2>
+      <div className="bg-white p-8 rounded-lg shadow-md text-center">
+        <div className="text-gray-400 mb-4">
+          <svg className="w-16 h-16 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+          </svg>
         </div>
-        <div className="p-8 text-center">
-          <div className="text-red-500 mb-4">Error loading tasks: {error}</div>
-          <button
-            onClick={fetchTasks}
-            className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
-          >
-            Retry
-          </button>
-        </div>
+        <h3 className="text-xl font-medium text-gray-900 mb-2">No tasks yet</h3>
+        <p className="text-gray-600">Create your first task to get started with priority scheduling.</p>
       </div>
     );
   }
 
   return (
-    <div className="bg-white rounded-lg shadow-md">
-      <div className="p-4 border-b">
-        <div className="flex justify-between items-center">
-          <h2 className="text-xl font-semibold">Tasks</h2>
-          <div className="flex space-x-2">
-            <button
-              onClick={() => setFilter('all')}
-              className={`px-3 py-1 rounded text-sm ${
-                filter === 'all' ? 'bg-blue-500 text-white' : 'bg-gray-200 text-gray-700'
-              }`}
-            >
-              All ({tasks?.length || 0})
-            </button>
-            <button
-              onClick={() => setFilter('pending')}
-              className={`px-3 py-1 rounded text-sm ${
-                filter === 'pending' ? 'bg-blue-500 text-white' : 'bg-gray-200 text-gray-700'
-              }`}
-            >
-              Pending ({tasks?.filter(t => t.status !== 'completed').length || 0})
-            </button>
-            <button
-              onClick={() => setFilter('completed')}
-              className={`px-3 py-1 rounded text-sm ${
-                filter === 'completed' ? 'bg-blue-500 text-white' : 'bg-gray-200 text-gray-700'
-              }`}
-            >
-              Completed ({tasks?.filter(t => t.status === 'completed').length || 0})
-            </button>
+    <div className="space-y-6">
+      {/* Pending Tasks */}
+      {pendingTasks.length > 0 && (
+        <div>
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-lg font-semibold text-gray-900">
+              Pending Tasks ({pendingTasks.length})
+            </h3>
+            <div className="text-sm text-gray-500">
+              Sorted by priority score
+            </div>
           </div>
-        </div>
-      </div>
-
-      <div className="max-h-96 overflow-y-auto">
-        {filteredTasks.length === 0 ? (
-          <div className="p-8 text-center text-gray-500">
-            {filter === 'all' ? 'No tasks yet. Add your first task!' : `No ${filter} tasks.`}
-          </div>
-        ) : (
-          <div className="space-y-2 p-4">
-            {filteredTasks.map((task) => (
-              <div
+          <div className="space-y-3">
+            {pendingTasks.map((task) => (
+              <TaskCard
                 key={task.id}
-                className={`border rounded-lg p-4 transition-all hover:shadow-md ${
-                  task.status === 'completed' ? 'bg-gray-50 opacity-75' : 'bg-white'
-                }`}
-              >
-                <div className="flex items-start justify-between">
-                  <div className="flex-1">
-                    <div className="flex items-center space-x-3">
-                      <input
-                        type="checkbox"
-                        checked={task.status === 'completed'}
-                        onChange={() => onToggleComplete(task.id)}
-                        className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
-                      />
-                      <h3 className={`font-medium ${
-                        task.status === 'completed' ? 'line-through text-gray-500' : 'text-gray-900'
-                      }`}>
-                        {task.title || 'Untitled Task'}
-                      </h3>
-                      {renderPriorityIndicator(task)}
-                    </div>
-                    
-                    {task.description && (
-                      <p className="text-sm text-gray-600 mt-2 ml-7">{task.description}</p>
-                    )}
-                    
-                    <div className="flex items-center space-x-4 mt-3 ml-7 flex-wrap gap-y-1">
-                      <span className="text-xs text-gray-500">
-                        Due: {formatDate(task.due_date)}
-                      </span>
-                      {task.estimated_duration && (
-                        <span className="text-xs text-gray-500">
-                          {task.estimated_duration} min
-                        </span>
-                      )}
-                      {task.difficulty_level && (
-                        <span className={`px-2 py-1 rounded text-xs ${getDifficultyColor(task.difficulty_level)}`}>
-                          Difficulty: {task.difficulty_level}
-                        </span>
-                      )}
-                      <span className="text-xs text-gray-500">
-                        Priority: {renderPriorityText(task)}
-                      </span>
-                    </div>
-                  </div>
-                  
-                  <button
-                    onClick={() => onDeleteTask(task.id)}
-                    className="text-red-500 hover:text-red-700 ml-4 p-1 rounded hover:bg-red-50 transition-colors"
-                    title="Delete task"
-                  >
-                    <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-                      <path fillRule="evenodd" d="M9 2a1 1 0 000 2h2a1 1 0 100-2H9zM4 5a2 2 0 012-2h8a2 2 0 012 2v6a2 2 0 01-2 2H6a2 2 0 01-2-2V5zm3 4a1 1 0 112 0v3a1 1 0 11-2 0V9zm4 0a1 1 0 112 0v3a1 1 0 11-2 0V9z" clipRule="evenodd" />
-                    </svg>
-                  </button>
-                </div>
-              </div>
+                task={task}
+                onToggleComplete={onToggleComplete}
+                onDeleteTask={onDeleteTask}
+                onEditTask={onEditTask}
+              />
             ))}
           </div>
-        )}
-      </div>
+        </div>
+      )}
+
+      {/* Completed Tasks */}
+      {completedTasks.length > 0 && (
+        <div>
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-lg font-semibold text-gray-900">
+              Completed Tasks ({completedTasks.length})
+            </h3>
+            <button 
+              className="text-sm text-gray-500 underline hover:text-gray-700"
+              onClick={() => {
+                // You could implement a "clear completed" function here
+                console.log('Clear completed tasks functionality');
+              }}
+            >
+              Clear completed
+            </button>
+          </div>
+          <div className="space-y-3">
+            {completedTasks.map((task) => (
+              <TaskCard
+                key={task.id}
+                task={task}
+                onToggleComplete={onToggleComplete}
+                onDeleteTask={onDeleteTask}
+                onEditTask={onEditTask}
+              />
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
