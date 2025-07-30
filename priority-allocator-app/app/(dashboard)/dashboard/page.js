@@ -120,9 +120,10 @@ const userId = "1"; // hard-coded
 
   const handleToggleComplete = async (taskId) => {
     const task = tasks.find(t => t.id === taskId);
-    const newStatus = task.status === 'completed' ? 'pending' : 'completed';
-
+    const newStatus = task.status === 'COMPLETED' ? 'PENDING' : 'COMPLETED';
+  
     try {
+      // Use the correct API endpoint with task ID in the URL path
       const response = await fetch(`/api/tasks/${taskId}`, {
         method: 'PUT',
         headers: {
@@ -130,16 +131,18 @@ const userId = "1"; // hard-coded
         },
         body: JSON.stringify({ status: newStatus }),
       });
-
+  
       if (response.ok) {
         const updatedTask = await response.json();
-        setTasks(prev => prev.map(t => t.id === taskId ? updatedTask : t));
+        // Update the task in your local state
+        setTasks(prev => prev.map(t => t.id === taskId ? updatedTask.task : t));
       } else {
-        throw new Error('Failed to update task');
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to update task');
       }
     } catch (error) {
       console.error('Error updating task:', error);
-      setError('Failed to update task');
+      setError('Failed to update task: ' + error.message);
     }
   };
 
